@@ -31,7 +31,11 @@ function UploadPanel({ setImages }) {
   return (
     <div className="upload-panel">
       <div className="upload-wrapper">
-        <Dragger {...props} className="upload-dragger">
+        <Dragger 
+          {...props} 
+          className="upload-dragger"
+          showUploadList={false}
+        >
           <p className="ant-upload-drag-icon">
             <InboxOutlined />
           </p>
