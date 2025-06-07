@@ -143,3 +143,33 @@ body {
   border-radius: 0.5rem;
   cursor: pointer;
 }
+
+.duplicate-border {
+  border: 3px solid rgba(255, 0, 0, 0.57);
+}
+
+/* -------------------- Approved Counter -------------------- */
+.approved-counter {
+  margin-bottom: 1.5rem;
+}
+
+.counter-text {
+  text-align: right;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  color: var(--color-blue-black);
+}
+
+.progress-bar {
+  height: 20px;
+  background-color: #e5e5e5;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  transition: width 0.3s ease-in-out;
+  background: linear-gradient(90deg, var(--color-purple) 0%, var(--color-yellow) 100%);
+  border-radius: 1rem;
+}

@@ -6,7 +6,9 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS images (
             filename TEXT PRIMARY KEY,
-            status TEXT DEFAULT 'all'
+            duplicate INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'all',
+            hash TEXT
         )
     ''')
     conn.commit()

@@ -3,6 +3,7 @@ import UploadPanel from './components/UploadPanel';
 import ImageCard from './components/ImageCard';
 import Toolbar from './components/Toolbar';
 import Navbar from './components/Navbar';
+import ApprovedCounter from './components/ApprovedCounter';
 import { Tabs, Pagination } from 'antd';
 import './App.css';
 
@@ -39,6 +40,7 @@ function App() {
       <h1 className="heading">Dataset Explorer</h1>
       <UploadPanel setImages={setImages} />
       <Toolbar />
+      <ApprovedCounter />
       <div className="tabs-wrapper">
         <Tabs
           activeKey={status}
