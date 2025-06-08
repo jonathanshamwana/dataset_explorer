@@ -21,11 +21,13 @@ body {
   padding: 2rem;
   max-width: 1200px;
   margin: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 /* -------------------- Navbar -------------------- */
 .navbar {
-  background-color: var(--color-purple);
+  background-color: var(--color-purple-dark);
   color: white;
   padding: 0.75rem 1.5rem;
   position: sticky;
@@ -92,6 +94,10 @@ body {
   justify-content: center;
   margin-top: 2rem;
   margin-bottom: 1.5rem;
+}
+
+.page-tabs {
+  margin-top: 3.5rem;
 }
 
 /* -------------------- Image Grid -------------------- */
@@ -172,4 +178,24 @@ body {
   transition: width 0.3s ease-in-out;
   background: linear-gradient(90deg, var(--color-purple) 0%, var(--color-yellow) 100%);
   border-radius: 1rem;
+}
+
+/* -------------------- Scraper Panel -------------------- */
+.scraper-panel {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.scraper-btn {
+  background-color: var(--color-purple-dark);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.scraper-btn:hover {
+  background-color: var(--color-purple-hover);
 }

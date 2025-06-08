@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import UploadPanel from './components/UploadPanel';
 import ImageCard from './components/ImageCard';
 import Toolbar from './components/Toolbar';
 import Navbar from './components/Navbar';
 import ApprovedCounter from './components/ApprovedCounter';
+import ScraperPanel from './components/ScraperPanel';
 import { Tabs, Pagination } from 'antd';
 import './App.css';
 
@@ -13,9 +14,9 @@ function App() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const IMAGES_PER_PAGE = 100;
+  const IMAGES_PER_PAGE = 50;
 
-  useEffect(() => {
+  const fetchImages = useCallback(() => {
     const offset = (page - 1) * IMAGES_PER_PAGE;
     fetch(`/api/images?status=${status}&limit=${IMAGES_PER_PAGE}&offset=${offset}`)
       .then(res => res.json())
@@ -23,6 +24,10 @@ function App() {
         setImages(data.images);
         setTotal(data.total);
       });
+  }, [page, status]);  
+
+  useEffect(() => {
+    fetchImages();
   }, [status, page]);
 
   const handleAction = (imageId, action) => {
@@ -38,7 +43,8 @@ function App() {
       <Navbar />
       <div className="app-container">
       <h1 className="heading">Dataset Explorer</h1>
-      <UploadPanel setImages={setImages} />
+      <UploadPanel refreshImages={fetchImages} />
+      <ScraperPanel refreshImages={fetchImages} />
       <Toolbar />
       <ApprovedCounter />
       <div className="tabs-wrapper">
@@ -63,6 +69,7 @@ function App() {
 
       <Pagination
         current={page}
+        className={"page-tabs"}
         pageSize={IMAGES_PER_PAGE}
         total={total}
         onChange={setPage}
