@@ -10,12 +10,12 @@ function Toolbar() {
 
   return (
     <div className="mb-4">
-      <Button
+      {/* <Button
        onClick={runFilters} 
        className="filters-button"
       >
         Run Auto Filters
-      </Button>
+      </Button> */}
     </div>
   );
 }

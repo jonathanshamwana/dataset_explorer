@@ -5,7 +5,7 @@ import '../App.css';
 
 const { Dragger } = Upload;
 
-function UploadPanel({ setImages }) {
+function UploadPanel({ refreshImages }) {
   const props = {
     name: 'files',
     multiple: true,
@@ -13,12 +13,8 @@ function UploadPanel({ setImages }) {
     onChange(info) {
       const { status } = info.file;
       if (status === 'done') {
-        if (Array.isArray(info.file.response)) {
-          setImages(prev => [...info.file.response, ...prev]);
-          message.success(`${info.file.name} uploaded successfully.`);
-        } else {
-          message.error(`Unexpected server response for ${info.file.name}.`);
-        }
+        refreshImages();  // ✅ Instead of setImages
+        message.success(`${info.file.name} uploaded successfully.`);
       } else if (status === 'error') {
         message.error(`${info.file.name} upload failed.`);
       }
@@ -31,11 +27,7 @@ function UploadPanel({ setImages }) {
   return (
     <div className="upload-panel">
       <div className="upload-wrapper">
-        <Dragger 
-          {...props} 
-          className="upload-dragger"
-          showUploadList={false}
-        >
+        <Dragger {...props} className="upload-dragger" showUploadList={false}>
           <p className="ant-upload-drag-icon">
             <InboxOutlined />
           </p>

@@ -9,7 +9,10 @@ from PIL import Image
 import imagehash
 import tempfile
 import subprocess
+import requests
+from bs4 import BeautifulSoup
 import uuid
+from google.api_core.exceptions import NotFound
 
 load_dotenv()
 app = Flask(__name__)
@@ -76,20 +79,21 @@ def list_images():
     c = conn.cursor()
 
     if status == "all":
-        c.execute("SELECT filename FROM images ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset))
+        c.execute("SELECT filename, status FROM images ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset))
+        rows = c.fetchall()
         total = conn.execute("SELECT COUNT(*) FROM images").fetchone()[0]
     else:
-        c.execute("SELECT filename FROM images WHERE status = ? ORDER BY rowid DESC LIMIT ? OFFSET ?", (status, limit, offset))
+        c.execute("SELECT filename, status FROM images WHERE status = ? ORDER BY rowid DESC LIMIT ? OFFSET ?", (status, limit, offset))
+        rows = c.fetchall()
         total = conn.execute("SELECT COUNT(*) FROM images WHERE status = ?", (status,)).fetchone()[0]
 
-
-    filenames = [row[0] for row in c.fetchall()]
     conn.close()
 
     images = [{
-        "filename": f,
-        "url": f"https://storage.googleapis.com/{bucket_name}/original/{f}"
-    } for f in filenames]
+        "filename": row[0],
+        "status": row[1],
+        "url": f"https://storage.googleapis.com/{bucket_name}/original/{row[0]}"
+    } for row in rows]
 
     return jsonify({"images": images, "total": total})
 
@@ -99,15 +103,27 @@ def action():
     image_id = data.get("imageId")
     action = data.get("action")
 
-    status_map = {"approve": "approved", "delete": "deleted"}
-    new_status = status_map.get(action, "all")
-
     conn = sqlite3.connect('images.db')
     c = conn.cursor()
-    c.execute("UPDATE images SET status = ? WHERE filename = ?", (new_status, image_id))
+
+    if action == "delete":
+        # Attempt to delete the file from GCS
+        blob = bucket.blob(f"original/{image_id}")
+        try:
+            blob.delete()
+        except NotFound:
+            print(f"⚠️ File not found in GCS: {image_id}, skipping blob deletion.")
+
+        # Remove from database regardless
+        c.execute("DELETE FROM images WHERE filename = ?", (image_id,))
+
+    elif action == "approve":
+        c.execute("UPDATE images SET status = 'approved' WHERE filename = ?", (image_id,))
+    else:
+        return jsonify({"success": False, "error": "Invalid action"}), 400
+
     conn.commit()
     conn.close()
-
     return jsonify({"success": True})
 
 @app.route("/api/stats", methods=["GET"])
@@ -173,16 +189,16 @@ def scrape():
 
         if result.returncode != 0:
             print("Gallery-dl failed:", result.stderr)
-            return jsonify({"success": False, "error": result.stderr}), 500
+            return jsonify({"success": False, "error": result.stderr.strip()}), 500
 
         uploaded = []
 
         for root, _, files in os.walk(temp_dir):
             for file in files:
-                if file.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                ext = file.lower().split(".")[-1]
+                if ext in ("jpg", "jpeg", "png", "webp"):
                     filepath = os.path.join(root, file)
                     filename = secure_filename(file)
-                    print("Handling file:", filename)
 
                     try:
                         result = handle_image_upload(filepath, filename)
@@ -192,7 +208,7 @@ def scrape():
                         print(f"Error processing {filename}: {e}")
 
         if not uploaded:
-            return jsonify({"success": False, "error": "No images were found in the scrape."}), 400
+            return jsonify({"success": False, "error": "No images were uploaded."}), 400
 
         return jsonify({
             "success": True,
@@ -200,9 +216,96 @@ def scrape():
             "uploaded": uploaded
         })
 
-
     except Exception as e:
         print("Scrape route failed:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    finally:
+        subprocess.run(["rm", "-rf", temp_dir])
+
+@app.route("/api/freescrape", methods=["POST"])
+def free_scrape():
+    data = request.get_json()
+    url = data.get("url")
+    temp_dir = f"/tmp/{uuid.uuid4()}"
+    os.makedirs(temp_dir, exist_ok=True)
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+    uploaded = []
+
+    try:
+        print("FREE SCRAPING")
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        if "vlisco" in url:
+            print("VLISCO IN URL")
+            product_links = []
+            for a_tag in soup.select("a"):
+                href = a_tag.get("href", "")
+                if href.startswith("/products/") and href not in product_links:
+                    product_links.append("https://vlisco.com" + href)
+
+            print(f"Found {len(product_links)} product links")
+
+            # Visit each product page and scrape images
+            for product_url in product_links:
+                try:
+                    print("TRYING TO FETCH FROM PRODUCT PAGE")
+                    prod_res = requests.get(product_url, headers=headers, timeout=10)
+                    prod_soup = BeautifulSoup(prod_res.text, "html.parser")
+                    img_tags = prod_soup.find_all("img")
+
+                    for i, img in enumerate(img_tags):
+                        src = img.get("src")
+                        if not src or not src.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                            continue
+                        if src.startswith("//"):
+                            src = "https:" + src
+                        elif src.startswith("/"):
+                            src = "https://vlisco.com" + src
+
+                        img_data = requests.get(src).content
+                        filename = f"vlisco_{uuid.uuid4()}.jpg"
+                        filepath = os.path.join(temp_dir, filename)
+                        with open(filepath, "wb") as f:
+                            print("WRITING PIXELS TO FILE")
+                            f.write(img_data)
+
+                        result = handle_image_upload(filepath, filename)
+                        if result:
+                            uploaded.append(result)
+                except Exception as e:
+                    print(f"Failed to process product page {product_url}: {e}")
+        else:
+            # Generic scraping
+            img_tags = soup.find_all("img")
+            for i, img in enumerate(img_tags):
+                src = img.get("src")
+                if not src or not src.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                    continue
+                if src.startswith("//"):
+                    src = "https:" + src
+                elif src.startswith("/"):
+                    src = url.rstrip("/") + src
+
+                img_data = requests.get(src).content
+                filename = f"scraped_{i}.jpg"
+                filepath = os.path.join(temp_dir, filename)
+                with open(filepath, "wb") as f:
+                    f.write(img_data)
+
+                result = handle_image_upload(filepath, filename)
+                if result:
+                    uploaded.append(result)
+
+        if not uploaded:
+            return jsonify({"success": False, "error": "No valid images scraped."}), 400
+
+        return jsonify({"success": True, "downloaded": len(uploaded), "uploaded": uploaded})
+
+    except Exception as e:
+        print("Free scrape error:", e)
         return jsonify({"success": False, "error": str(e)}), 500
 
     finally:
